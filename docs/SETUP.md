@@ -29,8 +29,8 @@ KinemaStudio/
   `opensim`, and `vtk` wheels target 3.12.
 - macOS arm64 (Apple Silicon) is the verified platform. The pins are
   all wheels; Linux x86_64 should resolve equivalently but is unverified.
-- `ffmpeg` on `PATH` if you render videos with `viz_osim.py` (imageio
-  uses it for H.264 output).
+- No system `ffmpeg` needed: `imageio-ffmpeg` (pinned) bundles its own
+  ffmpeg binary, which `viz_osim.py` uses via imageio for H.264 output.
 
 ## Install
 

@@ -90,6 +90,13 @@ def run(trc, model=None, out=None, start=None, end=None,
     ik = osim.InverseKinematicsSolver(osim_model, markers, coord_refs)
     ik.setAccuracy(acc)
 
+    def marker_errs():
+        # OpenSim 4.6's computeCurrentMarkerError takes the marker NAME
+        # (the int-index overload present in 4.5 was removed), so map
+        # each in-use index to its name.
+        return [ik.computeCurrentMarkerError(ik.getMarkerNameForIndex(i))
+                for i in range(ik.getNumMarkersInUse())]
+
     table = markers.getMarkerTable()
     times = [table.getIndependentColumn()[i]
              for i in range(table.getNumRows())]
@@ -119,7 +126,7 @@ def run(trc, model=None, out=None, start=None, end=None,
         ik.assemble(state)
     except RuntimeError as exc:
         n = ik.getNumMarkersInUse()
-        e = [ik.computeCurrentMarkerError(i) for i in range(n)]
+        e = marker_errs()
         rms = math.sqrt(sum(v * v for v in e) / n) if n else float("inf")
         if not (math.isfinite(rms) and rms <= revert_rms):
             raise RuntimeError(
@@ -156,7 +163,7 @@ def run(trc, model=None, out=None, start=None, end=None,
             ok = False
 
         n = ik.getNumMarkersInUse()
-        e = [ik.computeCurrentMarkerError(i) for i in range(n)]
+        e = marker_errs()
         rms = math.sqrt(sum(v * v for v in e) / n) if n else 0.0
 
         if not ok:
@@ -168,7 +175,7 @@ def run(trc, model=None, out=None, start=None, end=None,
                     for i in range(ncoord):
                         coords.get(i).setValue(state, last_q[i], False)
                     osim_model.assemble(state)
-                    e = [ik.computeCurrentMarkerError(i) for i in range(n)]
+                    e = marker_errs()
                     rms = math.sqrt(sum(v * v for v in e) / n) if n else 0.0
         q = [coords.get(i).getValue(state) for i in range(ncoord)]
         last_q = q

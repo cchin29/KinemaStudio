@@ -25,6 +25,8 @@ scikit-learn==1.8.0
 # --- geometry + video rendering (viz_osim) ---
 vtk==9.6.1
 imageio==2.37.3
+imageio-ffmpeg==0.6.0          # ffmpeg backend imageio needs to write .mp4
+                               # (bundles its own ffmpeg binary)
 
 # --- config + progress bars ---
 PyYAML==6.0.3

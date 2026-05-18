@@ -7,8 +7,9 @@ marker trajectory, then solved for joint kinematics, joint moments, and
 rendered as a muscle-activity video. No motion-capture suit, no markers,
 no force plates.
 
-The walkthrough below is the bundled `demo/practice_41d` clip
-(violin practice, ~20 s, 1080×1078 @ 30 fps) carried through every stage.
+The walkthrough below is the bundled `demo/Wieniawski2` clip
+(solo violin performance, ~17 s, 500 frames @ 30 fps) carried through
+every stage.
 
 ## The pipeline
 
@@ -60,10 +61,10 @@ Run the **whole pipeline** on the bundled clip with the top-level
 wrapper (defaults: heavy pose model, ROI hands):
 
 ```bash
-.venv/bin/python run_pipeline.py demo/practice_41d.mp4
+.venv/bin/python run_pipeline.py demo/Wieniawski2.mp4
 ```
 
-Outputs land in `runs/practice_41d/`. Options after `--` pass straight
+Outputs land in `runs/Wieniawski2/`. Options after `--` pass straight
 to Stage 1; e.g. the faster Holistic-only path:
 
 ```bash
@@ -100,7 +101,7 @@ models/
   mediapipe/                  MediaPipe .task bundles (auto-downloaded)
 templates/TEMPLATE_IK.xml     IK setup skeleton
 docs/SETUP.md                 environment reproduction guide
-demo/practice_41d.mp4         bundled example clip (run output is regenerable)
+demo/Wieniawski2.mp4          bundled example clip (run output is regenerable)
 requirements*.txt             pinned dependencies
 ```
 
