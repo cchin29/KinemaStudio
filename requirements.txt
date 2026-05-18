@@ -1,0 +1,31 @@
+# Unified environment for every src/*.py script.
+# Python 3.12 (3.12.13 verified). Install into .venv — see src/SETUP.md.
+#
+# Pinned to the exact versions verified working together on
+# macOS arm64 (Apple Silicon), 2026-05-17. opensim 4.6 is the PyPI
+# wheel (cp312, universal2) — no conda needed anymore.
+#
+#   .venv/bin/pip install -r requirements.txt
+#
+# For a byte-for-byte transitive lock, use requirements.lock.txt instead.
+
+# --- OpenSim IK / ID / scaling / viz (run_ik, run_id, scale_model, viz_osim) ---
+opensim==4.6
+
+# --- MediaPipe Stage 1 pose/hand extraction (mp2trc, mpipe_pipeline) ---
+mediapipe==0.10.35
+opencv-contrib-python==4.13.0.92
+
+# --- numeric / Stage 2 TRC build (all scripts) ---
+numpy==2.4.5
+pandas==3.0.3
+scipy==1.17.1
+scikit-learn==1.8.0
+
+# --- geometry + video rendering (viz_osim) ---
+vtk==9.6.1
+imageio==2.37.3
+
+# --- config + progress bars ---
+PyYAML==6.0.3
+tqdm==4.67.3

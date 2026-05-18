@@ -1,0 +1,32 @@
+# Python virtualenv
+.venv/
+venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# macOS
+.DS_Store
+
+# Local working notes (never published)
+scratchpad/
+
+# Auto-downloaded MediaPipe Tasks bundles (re-fetched on first run)
+models/mediapipe/*.task
+
+# OpenSim runtime log (written next to wherever a model is loaded)
+opensim.log
+
+# Pipeline run outputs
+runs/
+*.trc
+*.mot
+*.sto
+
+# Demo material: ship the small input clip so the quick-start runs;
+# ignore the regenerable derived run artifacts (annotated/merged/viz
+# videos, CSVs, IK/ID outputs under demo/practice_41d/).
+demo/*
+!demo/practice_41d.mp4

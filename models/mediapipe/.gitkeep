@@ -1,0 +1,3 @@
+# MediaPipe Tasks .task bundles auto-download here on first mp2trc.py run.
+# The bundles themselves are git-ignored (see .gitignore); this file
+# just keeps the directory in version control.
