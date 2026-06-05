@@ -87,7 +87,7 @@ requirements*.txt      pinned dependencies
 
 ### The model
 
-`combined_body_model.neck.osim` is the default — a full-body OpenSim model with detailed articulated hands, posed from MediaPipe markers (75.59 kg default subject). It is derived from `combined_body_model.osim` by `scratchpad/build_neck_model.py`, which adds a lumped head–neck joint (a 4.3 kg `head` body on a 3-DoF `neck` joint) and re-parents the 13 MediaPipe head/face markers onto it, so a subject looking down at an instrument no longer forces spurious trunk flexion. Pass `--model` (or set `model:` in `kinemastudio.yaml`) to use a different `.osim`; the original headless model remains as `combined_body_model.osim`.
+`combined_body_model.neck.osim` is the default — a full-body OpenSim model with detailed articulated hands, posed from MediaPipe markers (75.59 kg default subject). It is derived from `combined_body_model.osim` by `build_neck_model.py` (a one-off dev-time build script, not included in the published repo), which adds a lumped head–neck joint (a 4.3 kg `head` body on a 3-DoF `neck` joint) and re-parents the 11 MediaPipe head/face markers onto it, so a subject looking down at an instrument no longer forces spurious trunk flexion. Pass `--model` (or set `model:` in `kinemastudio.yaml`) to use a different `.osim`; the original headless model remains as `combined_body_model.osim`.
 
 ---
 
@@ -105,7 +105,7 @@ KinemaStudio is built on open-source tools and prior models; this is not origina
 - **OpenSim** (Delp et al. 2007) — the musculoskeletal simulation engine (IK/ID/SO). Used as a dependency via its Python API.
 - **OpenSim Creator** (Kewley, Beesel & Seth 2024) — model authoring/inspection.
 - **MediaPipe** (Lugaresi et al. 2019) — pose + 21-landmark hand tracking. Runtime dependency.
-- **Base musculoskeletal model** — `combined_body_model.osim` derives from the Rajagopal et al. 2016 full-body gait model for the body, a right hand model based on McFarland et al. 2023, which I mirrored to create a left-hand model (this was a significant modification of an early model from my prior work, Chin 2024). **My substantial changes:** In the current model for this repo, I've grafted the left and right hand models into the Rajagopal body gait model to create a full-body model with detailed bilateral hand musculature, and replaced the rigid neck joint to allow freedom of neck/head movement (in `build_neck_model.py`).  I created Mediapipe marker-to-model mapping for the 2x21 hand landmarks, 16 body landmarks and 11 head landmarks. I augmented MediaPipe's holistic body+head+hand model with customized hand tracking to improve fine-motion tracking/3D coordinate estimation of finger and other hand joints.  I've also tuned a number of joints and muscles in the model to address tracking accuracy and IK/ID simulation convergence issues. 
+- **Base musculoskeletal model** — `combined_body_model.osim` derives from the Rajagopal et al. 2016 full-body gait model for the body, a right hand model based on McFarland et al. 2023, which I mirrored to create a left-hand model (this was a significant modification of an early model from my prior work, Chin 2025). **My substantial changes:** In the current model for this repo, I've grafted the left and right hand models into the Rajagopal body gait model to create a full-body model with detailed bilateral hand musculature, and replaced the rigid neck joint to allow freedom of neck/head movement (in `build_neck_model.py`).  I created Mediapipe marker-to-model mapping for the 2x21 hand landmarks, 16 body landmarks and 11 head landmarks. I augmented MediaPipe's holistic body+head+hand model with customized hand tracking to improve fine-motion tracking/3D coordinate estimation of finger and other hand joints.  I've also tuned a number of joints and muscles in the model to address tracking accuracy and IK/ID simulation convergence issues. 
 - **Other libraries:** OpenCV, SciPy/NumPy, VTK, ffmpeg, (as well as ipyvolume for jupyter IK prototyping during model development; not part of this repo).
 - **Prior work this builds on:** Chin, C. (2025), *Biomechanical Motion Analysis with Computer Vision: A Feedback System for Improving Violin Vibrato Performance Technique*, *ThinkYou?!: Proceedings of the Bay Honors Consortium*.  This had an early version of the standalone left-hand biomechanical model, which was modified and integrated into the body model of this project.
 
@@ -143,7 +143,7 @@ Development took place over several weeks, following the pipeline stages.  Each 
 - Kok, L. M., et al. (2015). Musculoskeletal Complaints Among Professional Musicians: A Systematic Review. *Int. Arch. Occup. Environ. Health* 89(3), 373–396.
 - Ren, L., Jones, R. K., & Howard, D. (2008). Whole-body inverse dynamics over a complete gait cycle based only on measured kinematics. *J. Biomech.* 41(12), 2750–2759.
 - Chin, C. (2025). Biomechanical Motion Analysis with Computer Vision: A Feedback System for Improving Violin Vibrato Performance Technique. *ThinkYou?!: Proc. Bay Honors Consortium.*
-
+- Ueno, R. (2024). Calibrationless monocular musculoskeletal simulation during gait. Heliyon 10(11), e32078. doi:10.1016/j.heliyon.2024.e32078. 
 
 ---
 
