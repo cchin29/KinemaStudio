@@ -23,6 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mpipe_pipeline as M
+import pipeline_config as PC
 
 
 def id_out_path(mot):
@@ -42,12 +43,16 @@ def id_out_path(mot):
 
 
 def run(mot, model=None, out=None, start=None, end=None,
-        lowpass=-1.0, exclude=("Muscles",)):
+        lowpass=-1.0, exclude=("Muscles",), external_loads=None):
     """Solve Inverse Dynamics; returns the output .sto path.
 
     `mot` is an IK coordinates file (.mot/.sto, as written by
     run_ik.py). Time range defaults to the file's full span; `--start`
-    /`--end` clip it. `lowpass` < 0 disables coordinate filtering."""
+    /`--end` clip it. `lowpass` < 0 disables coordinate filtering.
+    `external_loads` is an OpenSim ExternalLoads .xml (e.g. from
+    run_grf.py) -- with it the base residual collapses to ~0 and the
+    joint moments become physically meaningful; without it ID is
+    top-down and the unbalanced wrench lands on the free base joint."""
     import opensim as osim
 
     mot = Path(mot).resolve()
@@ -58,6 +63,9 @@ def run(mot, model=None, out=None, start=None, end=None,
         raise FileNotFoundError(model_path)
     out = Path(out).resolve() if out else id_out_path(mot).resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
+    extloads = Path(external_loads).resolve() if external_loads else None
+    if extloads and not extloads.exists():
+        raise FileNotFoundError(extloads)
 
     # Full span from the coordinates file unless clipped. The tool would
     # clamp an unset range itself, but read it so the printed summary
@@ -76,6 +84,8 @@ def run(mot, model=None, out=None, start=None, end=None,
     for f in exclude:
         ex.append(f)
     idt.setExcludedForces(ex)
+    if extloads:
+        idt.setExternalLoadsFileName(str(extloads))
     # The tool writes results_dir/<output_gen_force_file> (filename
     # only), so split the chosen path into the two properties.
     idt.setResultsDir(str(out.parent))
@@ -98,6 +108,8 @@ def run(mot, model=None, out=None, start=None, end=None,
     print(f"time range : {t0:.4f} .. {t1:.4f} s  ({nrows} input rows)")
     print(f"forces excluded : {', '.join(exclude) or '(none)'}  |  "
           f"lowpass : {'off' if lowpass < 0 else f'{lowpass:g} Hz'}")
+    print(f"external loads : {extloads if extloads else '(none -- '
+          'top-down; base residual carries the net wrench)'}")
     return str(out)
 
 
@@ -127,10 +139,21 @@ def main(argv=None):
                     help="do NOT exclude muscle forces (default excludes "
                          "'Muscles': markerless has no measured muscle "
                          "activity, so ID gives net joint moments)")
+    ap.add_argument("--external-loads", default=None, metavar="XML",
+                    help="OpenSim ExternalLoads .xml (e.g. "
+                         "<root>.externalloads.xml from run_grf.py) so the "
+                         "ground reaction enters the dynamics; without it "
+                         "the net wrench lands on the free base joint")
+    PC.add_args(ap)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    _cfg = PC.apply(ap, "run_id", argv)
     a = ap.parse_args(argv)
+    if _cfg:
+        print(f"run_id: config {_cfg}", flush=True)
     run(a.mot, model=a.model, out=a.out, start=a.start, end=a.end,
         lowpass=a.lowpass,
-        exclude=() if a.include_muscles else ("Muscles",))
+        exclude=() if a.include_muscles else ("Muscles",),
+        external_loads=a.external_loads)
 
 
 if __name__ == "__main__":

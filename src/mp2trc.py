@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mpipe_pipeline as M
+import pipeline_config as PC
 
 
 def run(video, outdir=None, mode="combined", annotate=True, fps=None,
@@ -25,7 +26,7 @@ def run(video, outdir=None, mode="combined", annotate=True, fps=None,
         min_detection_confidence=M.DEFAULT_MIN_DET_CONF,
         min_tracking_confidence=M.DEFAULT_MIN_TRK_CONF, mp_options=None,
         pose_model="heavy", roi_hands=True, debug_roi=True,
-        hand_source="roi"):
+        hand_source="roi", combine_min_gap=1):
     """Process one video; returns the output directory Path."""
     video = Path(video)
     if not video.exists():
@@ -55,9 +56,24 @@ def run(video, outdir=None, mode="combined", annotate=True, fps=None,
         if csvs.get("merged"):
             print(f"      {Path(csvs['merged']).name}")
 
-    print(f"[2/2] TRC + IK ({mode}"
-          + (", hands=ROI" if hand_source == "roi" else "")
-          + ")"
+    if hand_source == "combined":
+        print("[2/3] Combine ROI + Holistic hands "
+              "(recover ROI-missing frames)")
+        import combine_hands
+        cstats = combine_hands.combine_root(root, min_gap=combine_min_gap)
+        for side in ("lh", "rh"):
+            s = cstats.get(side)
+            if s is None:
+                print(f"      {side}: skipped (no _{side}_roi.csv)")
+            else:
+                print(f"      {side}: recovered {s['recovered']} frame(s) "
+                      f"in {s['gaps_filled']} gap(s)"
+                      + (f"  [{s['reason']}]" if s["reason"] else ""))
+
+    stage = "[3/3]" if hand_source == "combined" else "[2/2]"
+    hs_tag = {"roi": ", hands=ROI", "combined": ", hands=combined"}.get(
+        hand_source, "")
+    print(f"{stage} TRC + IK ({mode}{hs_tag})"
           + ("" if center_on_model_com else " [NOT centered on model COM]"))
     trc = M.csv_to_trc(root, mode=mode, write_ik=write_ik,
                        center_on_model_com=center_on_model_com,
@@ -142,23 +158,35 @@ def main(argv=None):
                          "bad ROI) (default: on; --no-debug-roi disables). "
                          "Requires --roi-hands")
     ap.add_argument("--hand-source", default="roi",
-                    choices=["registered", "roi"],
+                    choices=["registered", "roi", "combined"],
                     help="hands feeding the TRC/IK: 'roi' (default; the "
                          "ROI-cropped HandLandmarker hands, already "
-                         "unified into the pose world frame) or "
+                         "unified into the pose world frame), 'combined' "
+                         "('roi' plus Holistic-recovered rows for "
+                         "ROI-missing frames -- see combine_hands.py; "
+                         "writes .combhands.trc/.IK.xml), or "
                          "'registered' (Holistic hands fused by "
                          "similarity registration onto the coarse pose "
-                         "points). 'roi' implies --roi-hands and writes a "
-                         "separate <root>[.MODE].roihands.trc/.IK.xml so "
-                         "the two IK solves can be compared. Requires "
-                         "--pose-model lite/full/heavy")
+                         "points). 'roi'/'combined' imply --roi-hands and "
+                         "write a separate <root>[.MODE].{roi,comb}hands."
+                         "trc/.IK.xml so the IK solves can be compared. "
+                         "Requires --pose-model lite/full/heavy")
+    ap.add_argument("--combine-min-gap", type=int, default=1, metavar="N",
+                    help="with --hand-source combined: only recover ROI "
+                         "gaps >= N frames; shorter gaps fall to the "
+                         "downstream interpolation (default: 1 = all)")
     ap.add_argument("--mp-config", default=None, metavar="YAML",
                     help="YAML overriding individual HolisticLandmarker "
                          "knobs (highest precedence; see --dump-mp-config)")
     ap.add_argument("--dump-mp-config", nargs="?", const="-", metavar="PATH",
                     help="write a template mp-config YAML to PATH (or "
                          "stdout if omitted) and exit")
+    PC.add_args(ap)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    _cfg = PC.apply(ap, "mp2trc", argv)
     a = ap.parse_args(argv)
+    if _cfg:
+        print(f"mp2trc: config {_cfg}", flush=True)
 
     if a.dump_mp_config is not None:
         tpl = M.mp_config_template()
@@ -172,11 +200,11 @@ def main(argv=None):
     if a.video is None:
         ap.error("video is required (omit it only with --dump-mp-config)")
 
-    if a.hand_source == "roi":
+    if a.hand_source in ("roi", "combined"):
         # The IK TRC needs the Stage-1 _roi CSVs, so force their emission.
         a.roi_hands = True
         if a.pose_model == "holistic":
-            ap.error("--hand-source roi requires --pose-model "
+            ap.error(f"--hand-source {a.hand_source} requires --pose-model "
                      "lite/full/heavy (the ROI hands derive from the "
                      "separate pose)")
     if a.roi_hands and a.pose_model == "holistic":
@@ -197,7 +225,7 @@ def main(argv=None):
         min_tracking_confidence=a.min_tracking_confidence,
         mp_options=mp_options, pose_model=a.pose_model,
         roi_hands=a.roi_hands, debug_roi=a.debug_roi,
-        hand_source=a.hand_source)
+        hand_source=a.hand_source, combine_min_gap=a.combine_min_gap)
 
 
 if __name__ == "__main__":

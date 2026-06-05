@@ -331,18 +331,22 @@ def _df_to_xyz(df, prefix):
 
 
 def load_landmark_frames(root, lowpass_hz=DEFAULT_LOWPASS_HZ):
-    """Read <root>_{lh,rh,pose}.csv (+ optional _{lh,rh}_roi.csv), build
-    a common frame superset, gap-fill, low-pass each landmark trajectory,
-    and return (times, sources) where sources maps name -> (xyz, leaves).
-    Hands absent on disk are returned as None. lowpass_hz=None disables
-    the filter. The _roi hands are the alternate ROI-cropped
-    HandLandmarker stream, already in the pose world frame."""
+    """Read <root>_{lh,rh,pose}.csv (+ optional _{lh,rh}_roi.csv and
+    _{lh,rh}_roi.combined.csv), build a common frame superset, gap-fill,
+    low-pass each landmark trajectory, and return (times, sources) where
+    sources maps name -> (xyz, leaves). Hands absent on disk are
+    returned as None. lowpass_hz=None disables the filter. The _roi
+    hands are the alternate ROI-cropped HandLandmarker stream, already
+    in the pose world frame; the _comb (combined) hands are _roi plus
+    Holistic-recovered rows for ROI-missing frames (see combine_hands)."""
     root = Path(root)
     pose_p = root.with_name(root.name + "_pose.csv")
     lh_p = root.with_name(root.name + "_lh.csv")
     rh_p = root.with_name(root.name + "_rh.csv")
     lh_roi_p = root.with_name(root.name + "_lh_roi.csv")
     rh_roi_p = root.with_name(root.name + "_rh_roi.csv")
+    lh_comb_p = root.with_name(root.name + "_lh_roi.combined.csv")
+    rh_comb_p = root.with_name(root.name + "_rh_roi.combined.csv")
     if not pose_p.exists():
         raise FileNotFoundError(pose_p)
 
@@ -353,9 +357,13 @@ def load_landmark_frames(root, lowpass_hz=DEFAULT_LOWPASS_HZ):
                  if lh_roi_p.exists() else None)
     rh_roi_df = (read_csv_prefix(rh_roi_p, "RIGHTHAND_")
                  if rh_roi_p.exists() else None)
+    lh_comb_df = (read_csv_prefix(lh_comb_p, "LEFTHAND_")
+                  if lh_comb_p.exists() else None)
+    rh_comb_df = (read_csv_prefix(rh_comb_p, "RIGHTHAND_")
+                  if rh_comb_p.exists() else None)
 
     maxfn = bddf["Frame Number"].max()
-    for d in (lhdf, rhdf, lh_roi_df, rh_roi_df):
+    for d in (lhdf, rhdf, lh_roi_df, rh_roi_df, lh_comb_df, rh_comb_df):
         if d is not None:
             maxfn = max(maxfn, d["Frame Number"].max())
     alldf = pd.DataFrame({"Frame Number": range(1, int(maxfn) + 1)})
@@ -378,7 +386,9 @@ def load_landmark_frames(root, lowpass_hz=DEFAULT_LOWPASS_HZ):
     sources = {"pose": src(bddf, ""), "lh": src(lhdf, "LEFTHAND_"),
                "rh": src(rhdf, "RIGHTHAND_"),
                "lh_roi": src(lh_roi_df, "LEFTHAND_"),
-               "rh_roi": src(rh_roi_df, "RIGHTHAND_")}
+               "rh_roi": src(rh_roi_df, "RIGHTHAND_"),
+               "lh_comb": src(lh_comb_df, "LEFTHAND_"),
+               "rh_comb": src(rh_comb_df, "RIGHTHAND_")}
     return times, sources
 
 
@@ -463,23 +473,24 @@ def build_marker_table(times, sources, mode, ref_pair, ref_dist_m,
     is unchanged; only the hand coordinates differ."""
     if mode not in ("combined", "left_hand", "right_hand", "body"):
         raise ValueError(f"bad mode {mode!r}")
-    if hand_source not in ("registered", "roi"):
+    if hand_source not in ("registered", "roi", "combined"):
         raise ValueError(f"bad hand_source {hand_source!r}")
 
     pose_xyz, pose_joints = sources["pose"]
     pose_m = condition_pose(pose_xyz, pose_joints, ref_pair, ref_dist_m,
                             z_rescale=z_rescale)
-    suf = "_roi" if hand_source == "roi" else ""
+    suf = {"roi": "_roi", "combined": "_comb", "registered": ""}[hand_source]
 
     def hand_block(base, side, prefix):
         key = base + suf
         if sources.get(key) is None:
             return None
         h_xyz, h_leaves = sources[key]
-        if hand_source == "roi":
+        if hand_source in ("roi", "combined"):
             # Already in the raw pose world frame (wrist anchored to the
             # pose wrist); the single MP->OS rotation lands it in the
-            # same OpenSim frame as the conditioned pose.
+            # same OpenSim frame as the conditioned pose. "combined" is
+            # _roi plus Holistic-recovered rows in the identical frame.
             placed = np.tensordot(h_xyz, MP_TO_OS, axes=(2, 0))
         else:
             placed = register_hand_to_pose(h_xyz, h_leaves, pose_m,
@@ -819,17 +830,25 @@ def csv_to_trc(root, mode="combined", model=DEFAULT_MODEL,
 
     hand_source: "registered" -- the Holistic hands fused by
     similarity registration. "roi" (the default) -- the alternate ROI-cropped
-    HandLandmarker hands (needs Stage-1 _{lh,rh}_roi.csv); output gets a
-    `.roihands` suffix so it never clobbers the registered TRC/IK and
-    the two IK solves can be compared."""
+    HandLandmarker hands (needs Stage-1 _{lh,rh}_roi.csv); `.roihands`
+    suffix. "combined" -- _roi plus Holistic-recovered rows for
+    ROI-missing frames (needs _{lh,rh}_roi.combined.csv from
+    combine_hands.py); `.combhands` suffix. Each source writes a
+    distinct TRC/IK so the solves can be compared."""
     root = Path(root)
-    if hand_source == "roi":
-        want = ("lh_roi",) if mode == "left_hand" else \
+    if hand_source in ("roi", "combined"):
+        base = ("lh_roi",) if mode == "left_hand" else \
                ("rh_roi",) if mode == "right_hand" else \
                ("lh_roi", "rh_roi")
-        missing = [root.with_name(root.name + f"_{k}.csv") for k in want
-                   if not root.with_name(root.name + f"_{k}.csv").exists()]
+        ext = ".combined.csv" if hand_source == "combined" else ".csv"
+        missing = [root.with_name(root.name + f"_{k}{ext}") for k in base
+                   if not root.with_name(root.name + f"_{k}{ext}").exists()]
         if missing:
+            if hand_source == "combined":
+                raise FileNotFoundError(
+                    f"hand_source='combined' needs {missing}; run "
+                    f"src/combine_hands.py on this <root> first "
+                    f"(mp2trc --hand-source combined does it for you)")
             raise FileNotFoundError(
                 f"hand_source='roi' needs {missing}; re-run Stage 1 with "
                 f"roi_hands=True (mp2trc --roi-hands --pose-model heavy)")
@@ -843,8 +862,9 @@ def csv_to_trc(root, mode="combined", model=DEFAULT_MODEL,
         center_table_on(table, model_com(model) - ref)
 
     if out_path is None:
-        suffix = _MODE_SUFFIX[mode] + (".roihands"
-                                       if hand_source == "roi" else "")
+        suffix = _MODE_SUFFIX[mode] + (
+            ".combhands" if hand_source == "combined"
+            else ".roihands" if hand_source == "roi" else "")
         out_path = root.with_name(root.name + suffix + ".trc")
     dt = np.diff(times)
     data_rate = float(1.0 / dt.mean()) if len(dt) else 100.0

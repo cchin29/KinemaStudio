@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mpipe_pipeline as M
+import pipeline_config as PC
 
 # measurement name -> (marker A, marker B, [bodies scaled by that span])
 MEASUREMENTS = [
@@ -152,7 +153,12 @@ def main(argv=None):
                          "shoulder->elbow span; not recommended)")
     ap.add_argument("--mass", type=float, default=-1.0,
                     help="final total mass kg (default: -1 = keep model's)")
+    PC.add_args(ap)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    _cfg = PC.apply(ap, "scale_model", argv)
     a = ap.parse_args(argv)
+    if _cfg:
+        print(f"scale_model: config {_cfg}", flush=True)
     run(a.trc, model=a.model, out=a.out, start=a.start, end=a.end,
         include_humerus=a.include_humerus, mass=a.mass)
 

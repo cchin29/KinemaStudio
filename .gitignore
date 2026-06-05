@@ -10,6 +10,10 @@ __pycache__/
 # macOS
 .DS_Store
 
+# Local editor / agent settings (not for publication)
+.claude/
+*.code-workspace
+
 # Local working notes (never published)
 scratchpad/
 
@@ -25,8 +29,17 @@ runs/
 *.mot
 *.sto
 
+# Per-subject scaled models (written beside the source model by
+# scale_model / run_pipeline --scale; regenerable from the clip's TRC)
+*.scaled.osim
+
+# run_so temp artifacts (reserve-augmented model / tool setup); normally
+# auto-cleaned, but a killed SO run can leave them beside the model
+*.so_tmp*.osim
+*.so_setup.xml
+
 # Demo material: ship the small input clip so the quick-start runs;
 # ignore the regenerable derived run artifacts (annotated/merged/viz
-# videos, CSVs, IK/ID outputs under demo/practice_41d/).
+# videos, CSVs, IK/ID outputs under demo/<clip>/).
 demo/*
-!demo/practice_41d.mp4
+!demo/Wieniawski2.mp4

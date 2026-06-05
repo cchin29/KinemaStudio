@@ -1,8 +1,8 @@
 # Environment setup
 
 A single Python 3.12 virtualenv (`.venv/` at the repo root) runs **every
-`src/*.py` script**: `mp2trc.py`, `mpipe_pipeline.py`, `run_ik.py`,
-`run_id.py`, `scale_model.py`, `viz_osim.py`.
+`src/*.py` script**: `mp2trc.py`, `mpipe_pipeline.py`, `combine_hands.py`,
+`run_ik.py`, `run_id.py`, `scale_model.py`, `viz_osim.py`.
 
 OpenSim ships a PyPI wheel (`opensim==4.6`, cp312 universal2), so no
 conda environment is needed — `opensim`, `mediapipe`, `vtk`, and OpenCV
@@ -13,7 +13,7 @@ combination).
 
 ```
 KinemaStudio/
-├── src/                         # the 6 pipeline scripts
+├── src/                         # the 7 pipeline scripts
 ├── models/
 │   ├── combined_body_model/     # combined_body_model.osim + Geometry/*.vtp
 │   └── mediapipe/               # MediaPipe .task bundles (auto-downloaded)
@@ -68,7 +68,7 @@ Expected: all 11 versions print, `cv2.dnn.DictValue ok: True`,
 `opensim Model() ok`. Then every CLI responds to `--help`:
 
 ```bash
-for s in mp2trc run_ik run_id scale_model viz_osim; do
+for s in mp2trc combine_hands run_ik run_id scale_model viz_osim; do
   .venv/bin/python src/$s.py --help >/dev/null && echo "$s OK"
 done
 ```
@@ -81,11 +81,18 @@ layout — pass `--model` / `--template` only to override.
 
 ```bash
 .venv/bin/python src/mp2trc.py      <clip.mp4> [...]   # video -> .trc + IK setup
+.venv/bin/python src/combine_hands.py <root> [...]     # recover ROI-missing hand frames
 .venv/bin/python src/scale_model.py <name>.trc [...]   # optional model scaling
 .venv/bin/python src/run_ik.py      <name>.trc [...]   # inverse kinematics -> .mot
 .venv/bin/python src/run_id.py      <name>.ik.mot [...] # inverse dynamics
 .venv/bin/python src/viz_osim.py    <model> <mot> [...] # render model+motion video
 ```
+
+Each of `mp2trc` / `run_ik` / `run_id` / `viz_osim` auto-reads the
+shared `kinemastudio.yaml` (its own section + the shared `model`), so a
+standalone re-run matches a full `run_pipeline.py` run. Precedence:
+built-in defaults < YAML < explicit flags. `--config PATH` overrides
+the location, `--no-config` ignores it; see `src/pipeline_config.py`.
 
 ## Notes / troubleshooting
 

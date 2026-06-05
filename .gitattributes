@@ -1,0 +1,25 @@
+# Canonical copy of .gitattributes (kept here because the file sync drops
+# dotfiles). Symlink or copy this to ../.gitattributes in the repo root.
+
+# Normalize line endings for real text; mark binaries/meshes/media as binary
+# so the macOS <-> Synology sync can't rewrite line endings, corrupt them, or
+# produce huge bogus text diffs (the .vtp meshes are the main victim).
+* text=auto
+
+# OpenSim / VTK assets
+*.vtp   binary
+*.osim  binary
+*.sto   binary
+*.mot   binary
+*.trc   binary
+
+# ML model bundles
+*.task  binary
+
+# Media
+*.mp4   binary
+*.mov   binary
+*.webm  binary
+*.gif   binary
+*.png   binary
+*.jpg   binary

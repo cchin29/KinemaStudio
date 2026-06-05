@@ -22,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mpipe_pipeline as M
+import pipeline_config as PC
 
 
 def run(trc, model=None, out=None, start=None, end=None,
@@ -252,7 +253,12 @@ def main(argv=None):
     ap.add_argument("--no-crop-meta", action="store_true",
                     help="ignore the <trc>.ik_meta.json sidecar (do NOT "
                          "auto-zero markers cropped out of frame)")
+    PC.add_args(ap)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    _cfg = PC.apply(ap, "run_ik", argv)
     a = ap.parse_args(argv)
+    if _cfg:
+        print(f"run_ik: config {_cfg}", flush=True)
     mw = {}
     for kv in a.marker_weight:
         k, v = kv.split("=")

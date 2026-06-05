@@ -1,0 +1,29 @@
+# KinemaStudio pipeline config -- read by run_pipeline.py AND by every
+# stage script (mp2trc / run_ik / run_id / viz_osim) when run standalone.
+# Auto-loaded from ./kinemastudio.yaml or the repo root; override with
+# --config PATH, ignore with --no-config.
+#
+# Precedence (low -> high):
+#   built-in defaults  <  values in THIS file  <  explicit CLI flags
+#   (and, for mp2trc, anything after `--`).
+
+# Default model for run_pipeline AND standalone run_ik/run_id/viz_osim:
+# the head-neck variant (built by scratchpad/build_neck_model.py). The
+# original headless combined_body_model.osim is still selectable via
+# --model or by editing this line. Relative to the repo root (the usual
+# CWD for these commands).
+model: models/combined_body_model/combined_body_model.neck.osim
+
+# No per-marker IK weight overrides: every marker stays at the 0.6
+# default. The head-over-bend and trunk-hunch that earlier motivated
+# head de-weighting + shoulder downgrade were caused by the *missing
+# neck joint*, now fixed at the model level (combined_body_model.neck
+# .osim). A weight sweep on Wieniawski2 (vs the video's 70 deg head-
+# vs-trunk, torso-fixed CV7 reference) confirms uniform 0.6 is optimal:
+#   uniform 0.6        RMS 0.0374  head-vs-trunk 69.3 (-1 deg vs video)
+#   NOSE1.0/face0.8/sh0.6  0.0376  67.7 (-2.6, slight over-correct)
+#   *any* sh0.1 config    ~0.039   +6..+13 deg over-bent (worse)
+# Restoring the shoulders (0.1 -> 0.6 default) alone improves both RMS
+# and posture; head landmarks need no special weight once the neck
+# joint exists. Add a run_ik: marker-weight: block here only if a
+# specific clip needs it.
