@@ -3,9 +3,11 @@
 **Markerless biomechanics from a single video.** KinemaStudio turns an
 ordinary RGB clip into a driven OpenSim musculoskeletal simulation — pose
 and hand tracking with Google MediaPipe, fused into an OpenSim-ready
-marker trajectory, then solved for joint kinematics, joint moments, and
-rendered as a muscle-activity video. No motion-capture suit, no markers,
-no force plates.
+marker trajectory, then solved up the dynamics stack: joint kinematics,
+joint moments, kinematics-estimated ground reaction forces, and
+individual **muscle forces** (Static Optimization), rendered as a
+muscle-force video. No motion-capture suit, no markers, no force plates —
+the ground reactions are recovered from the motion itself.
 
 The walkthrough below is the bundled `demo/Wieniawski2` clip
 (solo violin performance, ~17 s, 500 frames @ 30 fps) carried through
@@ -37,13 +39,27 @@ data instead of blindly interpolating across the gap.
 
 ![mediapipe landmarks](docs/assets/02_mediapipe.gif)
 
-### 3 · Inverse kinematics & dynamics  (`run_ik.py` → `run_id.py`)
+### 3 · Kinematics, dynamics & muscle forces  (`run_ik.py` → `run_grf.py` → `run_id.py` → `run_so.py`)
 
 `run_ik.py` solves robust per-frame Inverse Kinematics of the
 `combined_body_model` against the marker trajectory (a non-converging
 frame holds the last good pose instead of aborting the whole solve).
-`run_id.py` then runs Inverse Dynamics to recover the net joint moments
-that produced the motion.
+Optionally `scale_model.py` first fits the model's segment lengths to the
+subject from the markers, and `run_grf.py` estimates **ground reaction
+forces straight from the kinematics** (no force plates): the whole-body
+net wrench is fully determined by the motion + inertia, so it is computed
+from the posed frames and attributed to the feet as an OpenSim
+`ExternalLoads`.
+
+`run_id.py` then runs Inverse Dynamics for the net joint moments that
+produced the motion; with the estimated GRF applied it is dynamically
+consistent — the free-base residual collapses to ≈0 instead of absorbing
+the whole unbalanced load. Finally `run_so.py` runs **Static
+Optimization**, resolving those joint moments into the individual
+**muscle forces** that produced them (minimising summed activation² per
+frame, subject to each muscle's force capacity) — the per-muscle forces
+the render colours by. Scaling, GRF, and SO are each opt-in
+(`--scale` / `--grf` / `--so`); see [Quick start](#quick-start).
 
 ### 4 · Musculoskeletal render  (`viz_osim.py`)
 
@@ -155,8 +171,9 @@ and Ren et al. 2008 for the method.
 
 Settings you reuse can live in an optional `kinemastudio.yaml`
 (`src/pipeline_config.py`) — `outdir`/`model`/`no_id`/`no_viz`/`scale`/
-`so`/`grf` plus a per-stage block of extra flags for `mp2trc`/
-`scale_model`/`run_ik`/`run_grf`/`run_id`/`run_so`/`viz_osim`. The **wrapper and every stage script read the same file**,
+`so`/`grf`/`combine` plus a per-stage block of extra flags for `mp2trc`/
+`scale_model`/`run_ik`/`run_grf`/`run_id`/`run_so`/`viz_osim`/
+`combine_viz`. The **wrapper and every stage script read the same file**,
 so re-running one stage standalone (e.g. just `run_ik.py` after a
 weight tweak) honours the same config a full run would. Precedence is
 built-in defaults < YAML < explicit command-line flags (and anything
@@ -261,8 +278,14 @@ the original headless model remains as `combined_body_model.osim`.
   interpolation. Override after `--`: `-- --hand-source roi` for the
   ROI-only baseline, or `--pose-model holistic --no-roi-hands
   --hand-source registered` for the faster Holistic-only path.
-- Markerless capture has no measured muscle activity or force plates, so
-  Inverse Dynamics returns *net* joint moments, not muscle-resolved
-  forces. MediaPipe's shoulder is its noisiest landmark (a surface
-  point, not the glenohumeral center); `scale_model.py` excludes the
-  humerus from scaling for this reason.
+- Markerless capture has no measured muscle activity, force plates, or
+  external loads. `run_grf.py` recovers the ground reactions from the
+  kinematics and `run_so.py` resolves muscle forces by Static
+  Optimization, but both are **estimates**: SO leans on per-coordinate
+  reserve actuators where the model is under-actuated (a large reserve
+  flags low confidence there), and the double-support GRF split is
+  approximate even though the net wrench is exact. Treat the muscle
+  forces as relative, not validated absolutes.
+- MediaPipe's shoulder is its noisiest landmark (a surface point, not the
+  glenohumeral center); `scale_model.py` excludes the humerus from
+  scaling for this reason.
